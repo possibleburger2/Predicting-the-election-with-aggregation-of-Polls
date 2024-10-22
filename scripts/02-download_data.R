@@ -15,12 +15,18 @@ library(tidyverse)
 
 #### Download data ####
 # [...ADD CODE HERE TO DOWNLOAD...]
+# Define the URL and the relative path
+url <- "https://projects.fivethirtyeight.com/polls/data/president_polls.csv"
+relative_path <- "data/01-raw_data/raw_data.csv"
+
+
+# Download the file and save it to the relative path
+download.file(url, relative_path, mode = "wb")
+
+# Confirm the download
+cat("File downloaded to:", relative_path, "\n")
 
 
 
-#### Save data ####
-# [...UPDATE THIS...]
-# change the_raw_data to whatever name you assigned when you downloaded it.
-write_csv(the_raw_data, "inputs/data/raw_data.csv") 
 
          

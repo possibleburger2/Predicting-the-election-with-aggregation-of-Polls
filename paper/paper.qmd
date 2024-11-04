@@ -2,14 +2,13 @@
 title: "Polls of polls to predict the 2024 election"
 subtitle: "Kamala leads based on national level polling"
 author: 
-  - Daniel 
-  - Vandan
+  - Daniel Xu
+  - Vandan Patel
   - Dennis
 thanks: "Code and data are available at: [https://github.com/possibleburger2/](https://github.com/possibleburger2/temporary)."
 date: today
 date-format: long
-abstract: "This study models the 2024 U.S. Presidential Election by analyzing polling data with adjustments for factors like recency and sample size, aiming to capture up-to-date voter sentiment. Using aggregated poll data from the past four months (July 21 - November 2), we developed a multiple linear regression model to estimate Harris’ support in the popular vote and predict the winner in seven key battleground states. Our model estimates Kamala Harris leading with 47.5% support, approximately 1% ahead of Donald Trump in the popular vote, and winning in three of seven battleground states: Wisconsin, Michigan, and Pennsylvania. By prioritizing recent, high-quality polls, this analysis enhances predictive reliability, offering insights that could inform campaign strategies and public discourse. These findings underscore the importance of weighting and time-sensitive adjustments in forecasting, balancing accuracy with responsiveness to current trends.
-"
+abstract: "This study models the 2024 U.S. Presidential Election by analyzing polling data with adjustments for factors like recency and sample size, aiming to capture up-to-date voter sentiment. Using aggregated poll data from the past four months (July 21 - November 2), we developed a multiple linear regression model to estimate Harris’ support in the popular vote and predict the winner in seven key battleground states. Our model estimates Kamala Harris leading with 47.5% support, approximately 1% ahead of Donald Trump in the popular vote, and winning in three of seven battleground states: Wisconsin, Michigan, and Pennsylvania. By prioritizing recent, high-quality polls, this analysis enhances predictive reliability, offering insights that could inform campaign strategies and public discourse. These findings underscore the importance of weighting and time-sensitive adjustments in forecasting, balancing accuracy with responsiveness to current trends."
 format: pdf
 number-sections: true
 bibliography: references.bib
@@ -162,7 +161,7 @@ bar_plot <- ggplot(analysis_data, aes(x = pollscore)) +
   geom_histogram(aes(y = after_stat(density)), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.6) +
   geom_density(color = "black", size = 0.7) +
   labs(x = "Pollscore", y = "Density") +
-  scale_x_continuous(breaks = seq(-1.5, 1.5, by = 0.5)) +  # Adds more frequent x-axis labels
+  scale_x_continuous(breaks = seq(0, 1.5, by = 0.5)) +  # Adds more frequent x-axis labels
   theme_minimal() +
   theme(legend.position = "none")
 # Histogram with density line for pollscore with more x-axis labels
@@ -170,7 +169,7 @@ bar_plot2 <- ggplot(analysis_data, aes(x = transparency_score)) +
   geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black", alpha = 0.6) +
   geom_density(color = "black", size = 0.7) +
   labs(x = "Transparency score", y = "Density") +
-  scale_x_continuous(breaks = seq(-1.5, 1.5, by = 0.5)) +  # Adds more frequent x-axis labels
+  scale_x_continuous(breaks = seq(0,10, by = 2)) +  # Adds more frequent x-axis labels
   theme_minimal() +
   theme(legend.position = "none")
 
@@ -182,8 +181,7 @@ combined_plot
 
 ```
 
-@fig-reli shows the distribution of Numeric Grade (left) and Pollscore (right) across polling organizations. The Numeric Grade distribution shows that most pollsters are rated between 1.5 and 3, with peaks around 2.0 and 2.5, suggesting a concentration of pollsters with moderate to high reliability scores. In contrast, the Pollscore distribution, where lower values indicate higher reliability, shows a range primarily between -1.5 and 0, with a notable peak around -0.5. This suggests that while many polls demonstrate relatively low bias, there is still variability in reliability across organizations. The distinction between these two metrics emphasizes the need to consider both quality (Numeric Grade) and potential systematic bias (Pollscore) when weighting polls in the model.
-
+@fig-reli shows the distribution of Numeric Grade (left) and Pollscore (right) and transparency Score (bottom) across polling institutions. While Numeric grade and Transperency score both indicate higher quality polls with an increase in value, pollscore represents an increase in quality with a decrease in value. Overall most polls seem to be somewhat high quality based off the three graphs.
 
 \newpage
 

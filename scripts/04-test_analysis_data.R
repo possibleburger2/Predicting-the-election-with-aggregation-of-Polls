@@ -16,54 +16,35 @@ data <- read_csv("data/02-analysis_data/analysis_data.csv")
 
 
 #### Test data ####
-# Test that the dataset has 151 rows - there are 151 divisions in Australia
-test_that("dataset has 151 rows", {
-  expect_equal(nrow(analysis_data), 151)
-})
+# Define validation rules
+rules <- validator(
+  is.numeric(poll_id),                           # 'poll_id' is integer type
+  is.character(state),                           # 'state' column is character type
+  all(as.Date(end_date, format="%m/%d/%y") >= as.Date("2021-01-01") & 
+        as.Date(end_date, format="%m/%d/%y") <= as.Date("2024-11-05")), # 'end_date' is between 2021-01-01 and 2024-11-05
+  is.numeric(transparency_score),                # 'transparency_score' is numeric type
+  is.character(candidate_name),                  # 'candidate_name' column is character type
+  is.numeric(pct),                               # 'pct' column is numeric type
+  all(transparency_score >= 0 & transparency_score <= 10), # 'transparency_score' is between 0 and 10
+  
+  # 'state' contains only valid US states or NA values
+  all(is.na(state) | state %in% c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", 
+                                  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", 
+                                  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", 
+                                  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", 
+                                  "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", 
+                                  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", 
+                                  "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", 
+                                  "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", 
+                                  "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming", 
+                                  "Nebraska CD-1", "Nebraska CD-2", "Nebraska CD-3","Maine CD-1", "Maine CD-2")),
+  
+  all(pct >= 0 & pct <= 100) # 'pct' is a percentage between 0 and 100 for each candidate
+)
 
-# Test that the dataset has 3 columns
-test_that("dataset has 3 columns", {
-  expect_equal(ncol(analysis_data), 3)
-})
+# Apply rules to data
+validation_results <- confront(data, rules)
 
-# Test that the 'division' column is character type
-test_that("'division' is character", {
-  expect_type(analysis_data$division, "character")
-})
+# Summary of validation
+summary(validation_results)
 
-# Test that the 'party' column is character type
-test_that("'party' is character", {
-  expect_type(analysis_data$party, "character")
-})
-
-# Test that the 'state' column is character type
-test_that("'state' is character", {
-  expect_type(analysis_data$state, "character")
-})
-
-# Test that there are no missing values in the dataset
-test_that("no missing values in dataset", {
-  expect_true(all(!is.na(analysis_data)))
-})
-
-# Test that 'division' contains unique values (no duplicates)
-test_that("'division' column contains unique values", {
-  expect_equal(length(unique(analysis_data$division)), 151)
-})
-
-# Test that 'state' contains only valid Australian state or territory names
-valid_states <- c("New South Wales", "Victoria", "Queensland", "South Australia", "Western Australia", 
-                  "Tasmania", "Northern Territory", "Australian Capital Territory")
-test_that("'state' contains valid Australian state names", {
-  expect_true(all(analysis_data$state %in% valid_states))
-})
-
-# Test that there are no empty strings in 'division', 'party', or 'state' columns
-test_that("no empty strings in 'division', 'party', or 'state' columns", {
-  expect_false(any(analysis_data$division == "" | analysis_data$party == "" | analysis_data$state == ""))
-})
-
-# Test that the 'party' column contains at least 2 unique values
-test_that("'party' column contains at least 2 unique values", {
-  expect_true(length(unique(analysis_data$party)) >= 2)
-})

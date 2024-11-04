@@ -3,10 +3,7 @@
 library(tidyverse)
 library(janitor)
 library(lubridate)
-library(broom)
-library(modelsummary)
-library(rstanarm)
-library(splines)
+library(arrow)
 
 
 #### Prepare dataset ####
@@ -14,21 +11,37 @@ library(splines)
 data <- read_csv("data/01-raw_data/raw_data.csv") |>
   clean_names()
 
-# Filter data to Harris estimates based on high-quality polls after she declared
-just_harris_high_quality <- data |>
+
+analysis_data <- data |>
+  select(
+    pollster, numeric_grade, state, candidate_name, pct, sample_size, pollscore,   # Selecting relevant columns
+    population, end_date
+    )|>
+  drop_na(numeric_grade,pct,sample_size, end_date
+          )|>
   filter(
-    candidate_name == "Kamala Harris",
-    numeric_grade >= 2.7 # Need to investigate this choice - come back and fix. 
-    # Also need to look at whether the pollster has multiple polls or just one or two - filter out later
-  ) |>
+    numeric_grade >= 2 # Based off mean and median 
+  )|>
   mutate(
-    state = if_else(is.na(state), "National", state), # Hacky fix for national polls - come back and check
+    state = if_else(is.na(state) | state == "--", "National", state),
+    national_poll = if_else(state == "National",1,0)
+  )|> 
+  mutate(
     end_date = mdy(end_date)
-  ) |>
-  filter(end_date >= as.Date("2024-07-21")) |> # When Harris declared
+  )|>
+  filter(end_date >= as.Date("2024-07-21")
+  )|>
   mutate(
-    num_harris = round((pct / 100) * sample_size, 0) # Need number not percent for some models
+    recency = as.numeric(difftime(as.Date("2024-11-05"), end_date, units = "days")) # Give newer polls higher weight
+  )|>
+  mutate(
+    pollster = factor(pollster),
+    state = factor(state),
+    candidate_name = factor(candidate_name),
+    population = factor(population),  
+    national_poll = factor(national_poll)
   )
 
 
-write_csv(just_harris_high_quality,"data/02-analysis_data/analysis_data.csv")
+write_csv(analysis_data,"data/02-analysis_data/analysis_data.csv")
+write_parquet(analysis_data,"data/02-analysis_data/analysis_data.parquet")

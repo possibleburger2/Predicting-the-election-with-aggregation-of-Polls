@@ -51,9 +51,15 @@ This research is significant for campaign strategy, as precise voter support pre
 
 # Data {#sec-data}
 
+Our polling data analysis was conducted using the R programming language [@citeR]. The dataset, sourced from FiveThirtyEight [@fivethirtyeight2024] and encompassing polling data up to November 2, 2024, provides a comprehensive snapshot of public opinion leading into the election. Following the guidelines in @tellingstories, we examined factors affecting voter support percentages, such as poll timing, polling organization characteristics, and regional differences.
+
+To enhance data manipulation, modeling, and visualization, we utilized several R packages. The `tidyverse` package streamlined data wrangling and analysis, improving workflow efficiency [@thereferencecanbewhatever], while the `here` package managed file paths, aiding reproducibility [@citehere]. For data verification, `testthat` was used to confirm that dataset variables were correctly formatted [@citetestthat]. The `knitr` package’s `kable` function allowed for clean table formatting [@citeknitr], and `janitor` supported data cleaning by addressing any dataset quality issues [@citejanitor]. For date manipulation, `lubridate` simplified handling of time variables [@citelubridate], and `arrow` optimized data I/O in parquet format, essential for managing larger datasets [@citearrow]. The `ggplot2` package facilitated data visualization, adding clarity to the analysis [@citeggplot2].
+
+Specialized packages were also used for specific tasks. `modelsummary` enabled efficient reporting of model summaries, streamlining the presentation of regression results [@citemodelsummary], while `RColorBrewer` provided cohesive color palettes to enhance visualization clarity [@citeRColorBrewer]. To improve computational efficiency during model training, we utilized `future` for parallel processing [@citefuture]. For model validation, the `boot` package supported K-Fold cross-validation to assess stability and reliability [@citeboot1;@citeboot2], and `caret` facilitated training and performance evaluation across cross-validation folds [@citecaret]. Our coding structure and file organization were guided by best practices outlined in @tellingstories.
 
 
-# Overview
+
+## Overview
 The dataset comprises polling data focused on the 2024 U.S. Presidential Election, sourced from prominent aggregators that prioritize transparency and reliability. Each poll is evaluated based on a series of metrics that indicate the quality and methodological rigor of the polling organization. Here, we focus on three key variables that directly assess poll quality: pollscore, transparency_score, and numeric_grade. These variables capture essential aspects of pollster reliability, openness, and methodological rigor, allowing us to assess polling data with precision.
 #Measurement
 Each variable used in this analysis measures an aspect of poll quality:
@@ -64,7 +70,7 @@ Numeric Grade offers an additional reliability metric, scored from 0 to 3, with 
 
 
 
-# Sample size distribution
+## Sample size distribution
 ```{r, fig.width = 12, fig.height = 6}
 #| warning: false
 #| message: false
@@ -110,7 +116,7 @@ ggplot(state_data, aes(x = fct_infreq(state))) +
 @fig-statefreq shows there is significant differences in the amount different states are polled. The most polled states reflect what the public and publications refer to as swing states
 \newpage
 
-### Variation of Poll Quality and Support for Candiates by Pollster
+##Variation of Poll Quality and Support for Candiates by Pollster
 
 ```{r}
 #| warning: false
@@ -185,7 +191,7 @@ combined_plot
 
 \newpage
 
-### Support Trend For Candidates
+## Support Trend For Candidates
 
 ```{r}
 #| warning: false
@@ -211,7 +217,7 @@ ggplot(filtered_data, aes(x = as.Date(end_date), y = pct, color = candidate_name
 \newpage
 
 
-### Variability of Candidate support Across US States
+## Variability of Candidate support Across US States
 
 ```{r}
 #| echo: false

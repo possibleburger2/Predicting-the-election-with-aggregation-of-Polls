@@ -1,6 +1,6 @@
 ---
-title: "Statistical methods to "
-subtitle: "How differences in polls pf the 2024 US election can be used make predictions"
+title: "Polls of polls to predict the 2024 election"
+subtitle: "Kamala leads based on national level polling"
 author: 
   - Daniel 
   - Vandan
@@ -8,7 +8,8 @@ author:
 thanks: "Code and data are available at: [https://github.com/possibleburger2/](https://github.com/possibleburger2/temporary)."
 date: today
 date-format: long
-abstract: "Using polls of polls "
+abstract: "This study models the 2024 U.S. Presidential Election by analyzing polling data with adjustments for factors like recency and sample size, aiming to capture up-to-date voter sentiment. Using aggregated poll data from the past four months (July 21 - November 2), we developed a multiple linear regression model to estimate Harris’ support in the popular vote and predict the winner in seven key battleground states. Our model estimates Kamala Harris leading with 47.5% support, approximately 1% ahead of Donald Trump in the popular vote, and winning in three of seven battleground states: Wisconsin, Michigan, and Pennsylvania. By prioritizing recent, high-quality polls, this analysis enhances predictive reliability, offering insights that could inform campaign strategies and public discourse. These findings underscore the importance of weighting and time-sensitive adjustments in forecasting, balancing accuracy with responsiveness to current trends.
+"
 format: pdf
 number-sections: true
 bibliography: references.bib
@@ -23,87 +24,644 @@ library(knitr)
 library(kableExtra)
 library(readr)
 library(dplyr)
+library(arrow)
+library(here)
+library(patchwork)
+library(sf)
+library(car)
+
+# Load data
+analysis_data <- read_parquet(here("data/02-analysis_data/analysis_data.parquet"))
+us_states <- st_read(here("data/03-mapping_data/US"))
 ```
 
 
 # Introduction
 
-Overview paragraph
+Polls gauge voter sentiments and predict election outcomes however they have differences in methodology and biases that makes individual polls less reliable. We will aim to improve accuracy through aggregating polling data, reducing the impact of individual poll biases. This is done on both a national level, and on a state level, specifically "swing states" who hold a significant amount of electoral colleges, and commonly decide election outcomes.
 
-Estimand paragraph
+Our estimand is the voter support for Kamala Harris in the 2024 US election nationally and in swing states. We use aggregated polling data with a multiple linear regression model to forecast Kamala's vote percentage. Specifically, the model uses pollster, samples size, polling date, and state as predictor variables to quantify the relationships between predictors, and on the outcome: Kamala voter support. 
 
-Results paragraph
+The primary focus of our analysis is modeling Harris's support percentage using a range of predictor variables. We are especially interested in the effects of end date, polling organization, state, and poll score on voter support. Using a linear regression framework, we quantify the relationships between these predictors and support, clarifying the influence of each factor on Harris's overall support levels. By estimating predictor coefficients, we aim to draw insights into their impact on voter sentiment.
 
-Why it matters paragraph
+Our findings reveal a positive correlation between poll end dates and support percentages, suggesting an increase in voter support as the election nears. We also observe variability based on polling organization and state, with some pollsters consistently showing higher support for Harris. Poll quality impacts results as well, with reputable polls associating with higher support levels. These results highlight the importance of considering poll timing and pollster characteristics when analyzing public opinion.
 
-Telegraphing paragraph: The remainder of this paper is structured as follows. @sec-data....
-
-
-
+This research is significant for campaign strategy, as precise voter support predictions help campaigns tailor outreach and messaging to better engage voters. Recognizing variations across polling organizations and states assists in optimizing resource allocation and strategic focus. With elections often decided by narrow margins, having reliable insights into voter preferences can be pivotal.
 
 
 
 # Data {#sec-data}
 
-## Overview
-
-We use the statistical programming language R [@citeR].... Our data.... Following @tellingstories, we consider...
-
-Overview text
-
-## Measurement
-	
 
 
-## Outcome variables
+# Overview
+The dataset comprises polling data focused on the 2024 U.S. Presidential Election, sourced from prominent aggregators that prioritize transparency and reliability. Each poll is evaluated based on a series of metrics that indicate the quality and methodological rigor of the polling organization. Here, we focus on three key variables that directly assess poll quality: pollscore, transparency_score, and numeric_grade. These variables capture essential aspects of pollster reliability, openness, and methodological rigor, allowing us to assess polling data with precision.
+#Measurement
+Each variable used in this analysis measures an aspect of poll quality:
 
-
-
-## Predictor variables
-
-Add graphs, tables and text.
-
-Use sub-sub-headings for each outcome variable and feel free to combine a few into one if they go together naturally.
+Pollscore quantifies overall reliability, with lower (more negative) scores indicating greater historical accuracy.
+Transparency Score reflects the level of methodological disclosure by each polling organization, scaled from 0 to 10, where a higher score denotes more comprehensive transparency.
+Numeric Grade offers an additional reliability metric, scored from 0 to 3, with higher values indicating greater reliability based on the polling organization’s historical performance.
 
 
 
-# Model {#set-model}
-Explain why model we chose over something like linear
-We want to include polls with different methodology 
-Test impact different poll measures have on the model
-Reduce weighting or eliminate polls with partisan influence (endorsement, sponsorship etc)
+# Sample size distribution
+```{r, fig.width = 12, fig.height = 6}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: fig-ssdistribution
+#| fig-cap: "Distribution of Sample Sizes Across Polls: Majority of polls have sample sizes under 5,000, with a few outliers at larger sizes."
+
+# Plot histogram for all sample sizes
+ggplot(analysis_data, aes(x = sample_size)) +
+  geom_histogram(binwidth = 300, fill = "green", color = "black", alpha = 0.7) +
+  labs(
+       x = "Sample Size",
+       y = "Count") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0,21000, by = 1000)) +
+  theme(
+    panel.grid = element_blank(),  # Remove grid lines
+    plot.title = element_text(size = 14, hjust = 0.5),  # Center the title
+    axis.title.y = element_text(margin = margin(r = 10))  # Increased gap for y-axis label
+  )
+
+```
+
+@fig-ssdistribution shows most polls are conducted with less than a 2000 sample size, many of which are around 1000-1500, with outliers past 5000.
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: fig-statefreq
+#| fig-cap: "State polling frequency reflects public interest in swing states"
+
+state_data <- filter(analysis_data, state != "National")
+ggplot(state_data, aes(x = fct_infreq(state))) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(
+    x = "State",
+    y = "Number of Polls"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+@fig-statefreq shows there is significant differences in the amount different states are polled. The most polled states reflect what the public and publications refer to as swing states
+\newpage
+
+### Variation of Poll Quality and Support for Candiates by Pollster
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: tbl-topster
+#| tbl-cap: "Top 5 most frequent pollsters, with count of polls, average pollscore (lower scores indicate less bias), and average numeric grade (higher values indicate greater reliability)."
+# Get the top 10 pollsters by frequency along with their average pollscore and numeric grade
+top_pollsters <- analysis_data %>%
+  group_by(pollster) %>%           # Group by the 'pollster' variable
+  summarize(
+    Count = n(),                   # Count the number of occurrences
+    Average_Pollscore = round(mean(pollscore, na.rm = TRUE), 2),  # Average pollscore
+    Average_Numeric_Grade = round(mean(numeric_grade, na.rm = TRUE), 2),  # Average numeric grade
+    .groups = 'drop'               # Drop grouping structure for cleaner output
+  ) %>%
+  arrange(desc(Count)) %>%         # Arrange in descending order of count
+  slice_head(n = 5)                # Select the top 10 pollsters
+
+# Rename the columns to remove underscores and capitalize 'Pollster'
+colnames(top_pollsters) <- c("Pollster", "Count", "Average Pollscore", "Average Numeric Grade")
+
+kable(top_pollsters, format = "markdown")
+
+```
+
+@tbl-topster shows the top 5 most frequent pollsters in the dataset, with each pollster’s total poll count, average pollscore (measuring reliability and historical accuracy), and average numeric grade (indicating overall quality). 
+### Distribution of Numeric Grade and Pollscore of Polls
+
+```{r, fig.width = 12, fig.height = 6}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: fig-reli
+#| fig-cap: "Distribution of Numeric Grade and Pollscore among polling organizations, highlighting variability in pollster reliability and potential bias across polls."
+
+library(patchwork)
+# Histogram with density line for numeric_grade
+density_plot <- ggplot(analysis_data, aes(x = numeric_grade)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 0.1, fill = "lightblue", color = "black", alpha = 0.6) +
+  geom_density(color = "black", size = 0.7) +
+  labs(x = "Numeric Grade", y = "Density") +
+  theme_minimal()
+
+# Histogram with density line for pollscore with more x-axis labels
+bar_plot <- ggplot(analysis_data, aes(x = pollscore)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 0.2, fill = "lightblue", color = "black", alpha = 0.6) +
+  geom_density(color = "black", size = 0.7) +
+  labs(x = "Pollscore", y = "Density") +
+  scale_x_continuous(breaks = seq(-1.5, 1.5, by = 0.5)) +  # Adds more frequent x-axis labels
+  theme_minimal() +
+  theme(legend.position = "none")
+# Histogram with density line for pollscore with more x-axis labels
+bar_plot2 <- ggplot(analysis_data, aes(x = transparency_score)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "lightblue", color = "black", alpha = 0.6) +
+  geom_density(color = "black", size = 0.7) +
+  labs(x = "Transparency score", y = "Density") +
+  scale_x_continuous(breaks = seq(-1.5, 1.5, by = 0.5)) +  # Adds more frequent x-axis labels
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine the plots side by side with a wider layout
+combined_plot <- density_plot + bar_plot + bar_plot2 + plot_layout(ncol = 2, widths = c(1.2, 1.2))
+
+# Display the combined plot
+combined_plot
+
+```
+
+@fig-reli shows the distribution of Numeric Grade (left) and Pollscore (right) across polling organizations. The Numeric Grade distribution shows that most pollsters are rated between 1.5 and 3, with peaks around 2.0 and 2.5, suggesting a concentration of pollsters with moderate to high reliability scores. In contrast, the Pollscore distribution, where lower values indicate higher reliability, shows a range primarily between -1.5 and 0, with a notable peak around -0.5. This suggests that while many polls demonstrate relatively low bias, there is still variability in reliability across organizations. The distinction between these two metrics emphasizes the need to consider both quality (Numeric Grade) and potential systematic bias (Pollscore) when weighting polls in the model.
+
+
+\newpage
+
+### Support Trend For Candidates
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: fig-trend
+#| fig-cap: "Support over time for both candidates."
+
+
+filtered_data <- analysis_data %>%
+  filter(candidate_name %in% c("Kamala Harris", "Donald Trump"))
+
+# Plotting
+ggplot(filtered_data, aes(x = as.Date(end_date), y = pct, color = candidate_name)) +
+  geom_point(alpha = 0.3, size = 1.5) +
+  geom_smooth(method = "loess", se = TRUE, span = 0.2) +
+  scale_color_manual(values = c("Kamala Harris" = "steelblue", "Donald Trump" = "indianred")) +
+  labs(x = "Date", y = "Support (%)") +
+  theme_minimal() 
+```
+
+@fig-trend each dot represents an individual poll, with polling frequency increasing as the election approaches. Despite a large amount of variance of polling support, overall many polls suggest support for both candidates has become very close.
+\newpage
+
+
+### Variability of Candidate support Across US States
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| inlcude: false
+
+# Create the dataset for mapping support
+support_by_state <- analysis_data %>%
+  # Filter for only Kamala Harris and Donald Trump
+  filter(candidate_name %in% c("Kamala Harris", "Donald Trump")) %>%
+  # Group by state and candidate
+  group_by(state, candidate_name) %>%
+  # Calculate the mean support percentage for each candidate in each state
+  summarize(mean_support = mean(pct, na.rm = TRUE)) %>%
+  # Spread the data so that each state has a column for each candidate's mean support
+  pivot_wider(names_from = candidate_name, values_from = mean_support) %>%
+  # Rename columns for clarity
+  rename(kamala_mean_support = `Kamala Harris`, trump_mean_support = `Donald Trump`) %>%
+  # Calculate total mean support for both candidates in each state
+  mutate(total_support = kamala_mean_support + trump_mean_support,
+         # Calculate proportion of support for each candidate out of the total
+         kamala_proportion = kamala_mean_support / total_support,
+         trump_proportion = trump_mean_support / total_support) %>%
+# Select relevant columns
+  select(state, kamala_proportion, trump_proportion)
+
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| include: false
+
+map_data <- us_states %>%
+  left_join(support_by_state, by = c("NAME" = "state")) 
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: fig-map
+#| fig-cap: "Proportion of support for Kamala Harris relative to Donald Trump across U.S. states. Blue indicates states where Harris has higher support, while red indicates states where Trump leads. Color intensity reflects the magnitude of support difference, with gray indicating insufficient polling data."
+support_by_state <- analysis_data %>%
+  # Filter for only Kamala Harris and Donald Trump
+  filter(candidate_name %in% c("Kamala Harris", "Donald Trump")) %>%
+  # Group by state and candidate
+  group_by(state, candidate_name) %>%
+  # Calculate the mean support percentage for each candidate in each state
+  summarize(mean_support = mean(pct, na.rm = TRUE)) %>%
+  # Spread the data so that each state has a column for each candidate's mean support
+  pivot_wider(names_from = candidate_name, values_from = mean_support) %>%
+  # Rename columns for clarity
+  rename(kamala_mean_support = `Kamala Harris`, trump_mean_support = `Donald Trump`) %>%
+  # Calculate total mean support for both candidates in each state
+  mutate(support_difference = ((kamala_mean_support - trump_mean_support)/(kamala_mean_support + trump_mean_support)))
+# Select relevant columns
+map_data <- us_states %>%
+  left_join(support_by_state, by = c("NAME" = "state"))
+# Filter out Alaska, Hawaii, and Puerto Rico using subset
+map_data_continental <-
+  subset(map_data,!NAME %in% c("Alaska", "Hawaii", "Puerto Rico"))
+
+ggplot(map_data_continental) +
+  geom_sf(aes(fill = support_difference * 100),
+          color = "white",
+          size = 0.2) +
+  geom_text(
+    aes(label = STUSPS, geometry = geometry),
+    stat = "sf_coordinates",
+    color = "black",
+    size = 3
+  ) +  # Adjust color and size as needed
+  scale_fill_distiller(
+    palette = "RdBu",
+    direction = 1,
+    na.value = "grey",
+    name = "Difference in support"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    aspect.ratio = 0.5  # Make the plot wider
+  )
 
 
 
-## Model set-up
+```
+
+@fig-map shows the voting proportion of the two candidates, with darker reds being in favor of Trump and Darker blues being in favor of Harris. Grey is for states with insufficient polling data. 
+
+From the map you can see states like California being heavily left leaning vs states like Texas being heavily right leaning. Swing states are grey or white representing a close vote share between the two candidates. The historical precedent of states' voting habits are an important part of predicting elections hence why we use states as a predictor variable in our model.
+
+# Forecasting Election Outcome through Pooling Polls {#sec-model}
+
+## Forecasting Approach
+
+The polls of polls methodology is widely used in election prediction as it aggregates multiple polls to provide a more reliable estimate of voter support, rather than relying on any single poll. The goal is to reduce errors and biases present in individual polls by using a weighted average of many different polls.
+
+In our approach, we will employ linear modeling of voter support percentage (pct) on pollster and other independent variables such as sample size, poll recency, and poll scope (state vs. national). This will allow us to smooth out the inherent noise, biases, and variability across different pollsters. Once we obtain the predicted values from our model, we will weight these predictions based on the numeric grade (quality score) of each pollster to calculate an overall national estimate of the outcome. Additionally, we will separately compute estimates for key battleground states, where voter behavior can be more volatile and pivotal in deciding the final outcome of the election. This approach helps us capture both national trends and state-level dynamics.
 
 
-pollscore: A numeric value representing the score or reliability of the pollster in question (e.g., -1.1). "The error and bias we can attribute to a pollster. Negative numbers are better. Stands for "Predictive Optimization of Latent skill Level in Surveys, Considering Overall Record, Empirically.
 
-numeric_grade: A numeric rating given to the pollster to indicate their quality or reliability (e.g., 3.0).
+## Model
 
-methodology: The method used to conduct the poll (e.g., Online Panel).
+This section addresses the challenge of mitigating inherent biases and differences in polling data to create a robust prediction model. Our goal is to select a model with the right balance between complexity and fit, capturing the dynamics of polling data without overfitting. We evaluated various model specifications to find the one most suitable for our forecasting needs.
 
-transparency_score: A score reflecting the pollster’s transparency about their methodology (e.g., 9.0). "A grade for how transparent a pollster is, calculated based on how much information it discloses about its polls and weighted by 
-by recency. The highest Transparency Score is 10."
+Since variables like numeric grade and pollscore are perfectly collinear with pollster, they were excluded from the regression analysis to avoid multicollinearity issues. However, they remain essential in our weighting strategy, where we adjust for polling accuracy and reliability. Our focus is on core features such as pollster, sample size, state, and recency, with complexity gradually added to the model as appropriate.
 
-We run the model in R [@citeR].
+Through a systematic comparison of model specifications that incorporate these features, we aim to select the most effective model for achieving both predictive accuracy and generalizability.
 
+## Model Set-Up
+
+We model the support percentages for Kamala Harris and Donald Trump in each poll as a function of pollster, sample size, state, and poll recency.
+
+$$
+y_i = \alpha + \beta_1 \cdot \mathrm{pollster}_i + \beta_2 \cdot \mathrm{sample\_size}_i  + \epsilon_i
+$$
+$$
+y_i = \alpha +\beta_1 \cdot \mathrm{pollster}_i+ \beta_2 \cdot \mathrm{sample\_size}_i + \beta_3 \cdot \mathrm{state}_i+ \epsilon_i
+$$
+$$
+y_i = \alpha + \beta_1 \cdot \mathrm{pollster}_i+ \beta_2 \cdot \mathrm{sample\_size}_i + \beta_3 \cdot \mathrm{state}_i+ \beta_4 \cdot \mathrm{recency} +\epsilon_i
+$$
+
+
+Where
+
+-   $y_i$ is the percentage of support for candidate in poll i,
+
+-   $α$ is the intercept,
+
+-   $β_1$ captures the effect of the polling organization,
+
+-   $β_2$ captures the effect of the sample size,
+
+-   $β_3$ captures the effect of recency (how recent the poll is),
+
+-   $β_4$ capture the effects of the different states
+
+-   $\epsilon_i$ represents the error term, assumed to follow a normal distribution with mean 0.
+
+## Model Justification
+
+
+Our model is designed to smooth out inconsistencies and biases among polling organizations through a polls-of-polls method. Since individual polling agencies may introduce systematic differences—due to factors like sampling techniques, question wording, and historical tendencies—our model includes a pollster variable to adjust for these organization-specific biases. This approach provides an aggregated view of public support that minimizes the unique effects of any single poll.
+
+We also incorporate sample size as a predictor, as polls with larger samples generally produce more stable and reliable estimates, reducing random fluctuations associated with smaller samples. A state variable is included to account for regional political variations, which helps reflect different levels of support across geographic and demographic groups, enhancing our understanding of the political landscape. Additionally, recency is included to give priority to the most recent polls, as public opinion may shift in response to political events, and newer data typically better reflects current sentiment.
+
+By integrating these elements, our model aims to create a consistent measure of candidate support, minimizing the noise from individual poll discrepancies and focusing on a balanced, current aggregation of polling data.
+
+We chose a linear model to clearly quantify the marginal effects of each predictor (pollster, sample size, state, and recency) on candidate support. This setup is well-suited to our polls-of-polls framework, as it allows us to estimate fixed effects that adjust for systematic differences across pollsters while also treating sample size and recency as continuous influences. The modeling was conducted in R using the lm() function from the base stats package for linear regression analysis.
+
+## Model Results
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| label: tbl-summary
+#| tbl-cap: "Model performance summary showing improved fit and accuracy as State and Recency are added, with R² increasing from 0.375 in Model 1 to 0.774 in Model 3, and RMSE decreasing from 3.053 to 1.836."
+
+
+# Load your models
+model1 <- readRDS(here("models/model1.rds"))
+model2 <- readRDS(here("models/model2.rds"))
+model3 <- readRDS(here("models/model3.rds"))
+
+# Extract summary statistics and add variables included in each model
+model_summary <- tibble::tibble(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  Variables = c(
+    "Pollster, Sample Size",
+    "Pollster, Sample Size, State",
+    "Pollster, Sample Size, State, Recency"
+  ),
+  `R²` = c(
+    summary(model1)$r.squared,
+    summary(model2)$r.squared,
+    summary(model3)$r.squared
+  ),
+  `Adjusted R²` = c(
+    summary(model1)$adj.r.squared,
+    summary(model2)$adj.r.squared,
+    summary(model3)$adj.r.squared
+  ),
+  `AIC` = c(AIC(model1), AIC(model2), AIC(model3)),
+  `BIC` = c(BIC(model1), BIC(model2), BIC(model3)),
+  `RMSE` = c(sqrt(mean(
+    residuals(model1) ^ 2
+  )), sqrt(mean(
+    residuals(model2) ^ 2
+  )), sqrt(mean(
+    residuals(model3) ^ 2
+  )))
+)
+
+# Display the table using kable
+model_summary %>%
+  kable(caption = "Model Summary with Included Variables", digits = 3)
+
+```
+
+@tbl-summary     Model 1: With only Pollster and Sample Size, achieves an R² of 0.404, explaining 33.9% of the variance in candidate support.
+    Model 2: Adds State, increasing the explained variance to 68.4% and reducing both AIC and RMSE, which improves model fit and accuracy.
+    Model 3: Further includes Recency, boosting the explained variance to 71.1% and reducing RMSE to 1.836, enhancing explanatory power and predictive accuracy.
+
+This progression underscores the value of adding contextual variables like State and Recency for a more nuanced understanding of polling data.
+
+## Prediction
+
+We used Numeric grade as a weight for improving prediction accuracy as it both captures bias and transparency.
+
+$$
+w_i = \frac{\mathrm{numeric\_grade}_i }{\sum_{j=1}^{n} \mathrm{numeric\_grade}_j }
+$$
+
+where:
+
+-   $w_i$ represents the weight assigned to poll i,
+
+-   $numericgrade_i$ is the numeric grade of poll i, and
+
+-   $n$ is the total number of polls used in the analysis.
+
+
+The weight assigned to each poll combines both its quality (as represented by the numeric grade) and its level of bias (as indicated by the pollscore).  This approach gives more weight to polls that are both highly graded (indicating higher reliability and transparency) and less biased. Additionally, the total of all weights is normalized to sum to one, so each poll’s weight is proportionate to its quality and relative lack of bias, resulting in a more balanced and accurate average of public support.
+
+The overall weighted support is given by summing all the weights with the regression model.
+
+$$
+\text{Overall Weighted Support} = \sum_{i=1}^{n} w_i \cdot \hat{y}_i
+$$
+
+-   $\hat{y}_i$ is the predicted percentage of support for Kamala Harris from poll i.
+
+### Comparing Overall Weighted Support Across All Polls
+
+Aggregating support across all polls with weighted multiple linear regression, we estimate the overall support for each candidate.. Based on this approach, Kamala Harris has an estimated overall weighted support of around 47.91%, while Donald Trump stands at around 46.31%. This aggregation takes into account the varied methodologies and sampling qualities of different polling organizations.
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| include: true
+
+model6 <- readRDS(here("models/model6.rds"))
+
+# Step 1: Subset data for Kamala Harris, calculate weights, join with fitted values from model3, and calculate weighted_pct
+kamala_data <- analysis_data %>%
+  filter(candidate_name == "Kamala Harris") %>%
+  mutate(
+    weight = numeric_grade  /
+      sum(numeric_grade,  na.rm = TRUE),
+    fitted_values = fitted(model3),
+    # Replace this with actual fitted values for Kamala
+    weighted_pct = fitted_values * weight  # Calculate weighted percentage for Kamala
+  )
+
+# Calculate the overall weighted prediction for Kamala Harris
+kamala_weighted_support <-
+  sum(kamala_data$weighted_pct, na.rm = TRUE)
+
+# Step 2: Subset data for Donald Trump, calculate weights, join with fitted values from model6, and calculate weighted_pct
+trump_data <- analysis_data %>%
+  filter(candidate_name == "Donald Trump") %>%
+  mutate(
+    weight = numeric_grade /
+      sum(numeric_grade , na.rm = TRUE),
+    fitted_values = fitted(model6),
+    # Replace this with actual fitted values for Trump
+    weighted_pct = fitted_values * weight  # Calculate weighted percentage for Trump
+  )
+
+# Calculate the overall weighted prediction for Donald Trump
+trump_weighted_support <- sum(trump_data$weighted_pct, na.rm = TRUE)
+
+```
+
+
+# Discussion {#sec-discussion}
+
+This paper forecasts support for Kamala Harris and Donald Trump in the 2024 U.S. Presidential Election using a "poll-of-polls" approach. By aggregating multiple polls, we reduce individual survey biases and create a more balanced prediction for each candidate. Our model includes predictors such as pollster, sample size, state, and poll recency. We applied a weighting scheme based on each pollster’s numeric grade and poll score, reflecting reliability and potential bias, to provide a prediction that accounts for differences across states and polling organizations.
+
+A key finding is the significance of poll recency, which notably increased the model’s explanatory power, as reflected in improvements in R² and reductions in RMSE. This result highlights the dynamic nature of public opinion, where recent events influence voter perceptions and candidate support.
+
+Our state-level analysis shows close competition in key battleground states, emphasizing their importance in the 2024 election. In states like Pennsylvania, Michigan, and Wisconsin, Harris and Trump are nearly tied, indicating an intense contest for electoral votes. The model suggests that even slight shifts in support within these swing states could significantly impact the election outcome, underscoring the importance of regional polling in understanding voter sentiment and the outsized role of battleground states.
+
+## Weaknesses and Future Directions
+
+The model assumes linear relationships between predictors and candidate support, which may overlook more complex patterns or interactions. Although we weighted polls based on numeric grades, these scores may not fully capture each pollster’s accuracy. Future work could explore non-linear methods, such as machine learning, to account for variable interactions, and could refine the weighting mechanism by factoring in pollster performance history or state-specific polling differences.
+
+In conclusion, this paper offers a weighted forecast of candidate support across national and state levels. The evolving nature of voter sentiment and polling accuracy suggests a need for adaptive models that account for changes in public opinion over time.
 
 
 \newpage
 
 \appendix
 
+
+
+# Emerson College Polling Methodology (October 14-16, 2024) {#sec-pollster-meth}
+
+## Overview
+
+Emerson College Polling (ECP) conducted a survey from October 14-16, 2024, with a sample of 1,000 likely voters in the 2024 U.S. Presidential Election, using a mixed-mode methodology to reflect public opinion [@about_ecp]. The poll measured preferences between Kamala Harris (50%) and Donald Trump (49%), showing a close race [@ecp_poll]. For more details on ECP’s methodology, see Appendix A.
+
+## Population, Frame, and Sample
+
+The target population was likely U.S. voters, selected based on voter history, registration, and demographics, which participants self-reported [@ecp_poll]. The sampling frame consisted of voters in Aristotle’s database and CINT’s online panel, both widely used resources for voter data and survey responses [@about_ecp]. ECP's sample of 1,000 respondents was chosen from this frame.
+
+## Sample Recruitment and Data Collection
+
+ECP employed a mixed-mode sampling approach with three primary methods:
+
+- **MMS-to-web text surveys**: Texts directed participants to complete the survey online. This method used voter lists from Aristotle.
+- **Interactive Voice Response (IVR)**: Automated phone calls to landlines allowed responses via keypad entry, with contacts sourced from Aristotle’s lists.
+- **Online Panel from CINT**: ECP accessed a pre-screened, opt-in panel provided by CINT.
+
+## Advantages and Trade-Offs in Mixed-Mode Sampling
+
+The multi-mode approach helps reduce coverage bias [@mora]. MMS-to-web surveys often reach younger, mobile-oriented voters; IVR calls reach older, landline-using voters; and online panels capture tech-savvy respondents. This method is cost-effective, allowing a larger sample size [@large_ss]. However, each mode introduces its own measurement biases, which can add variability and increase the margin of error.
+
+## Non-Response Handling
+
+ECP applies weighting adjustments to balance demographics like age, gender, race, education, and party affiliation, making the sample more representative of the electorate [@weight].
+
+## Questionnaire Design
+
+The survey uses clear, straightforward questions, facilitating easy responses and focusing on vote preferences and demographics. However, it doesn’t capture deeper motivations behind voter choices, and variations in mode may impact respondent engagement and response accuracy.
+
+## Conclusion
+
+Emerson College Polling’s mixed-mode methodology provides a cost-effective approach with broad demographic reach. The weighting system helps address non-responses and improve representativeness. While this approach reduces coverage bias, it introduces combined measurement errors and potential bias due to mode differences, which should be considered in the analysis.
+
+
+
+
+
+\appendix
+
 # Appendix {-}
 
-Idealized poll
+## Methodology {#sec-methodology}
 
-Mixed mode polling: systematic phone polling, location based online polling, dont know if practical or expensive but maybe real life geographical polling?
-Make sure polls are done in locations where outcomes matter, dont over poll high density one sided areas
-Only use financial incentive if possible, thinking about non response bias
+In conducting this analysis, we adhere to a structured methodology to ensure reliable and transparent results. This study relies on polling data gathered from trusted aggregators, with an emphasis on those that meet stringent methodological standards. Key metrics used to evaluate polling quality include *pollscore*, *transparency_score*, and *numeric_grade*, each providing insight into the reliability and methodological rigor of the polls.
 
+1. **Pollscore**: This variable serves as an overall indicator of a pollster’s reliability, calculated based on historical accuracy across previous election cycles. Polls with more negative *pollscore* values are considered more reliable, as these scores are designed to reflect lower levels of predictive error. The consistency of a pollster’s performance is a central factor in assigning pollscore values, making this metric crucial for filtering out less reliable polls.
 
+2. **Transparency Score**: This score, on a scale from 0 to 10, assesses the extent of methodological detail disclosed by each polling organization. Polls with higher transparency scores share detailed information regarding their sampling methods, weighting practices, and data collection protocols, fostering confidence in the data’s reliability. Higher transparency generally correlates with greater poll quality, as it suggests that the polling organization has openly shared relevant details for evaluating the poll’s rigor and potential biases.
+
+3. **Numeric Grade**: Assigned by rating agencies, this metric ranks pollsters on a scale from 0 to 3, with higher scores representing greater reliability based on historical performance. This numeric rating serves as an additional quality filter, helping to ensure that only reputable polling data contribute to our analysis. Consistent high numeric grades across pollsters in our dataset affirm the robustness of the data for predictive purposes.
+
+Together, these three variables—pollscore, transparency_score, and numeric_grade—form a multidimensional view of each poll’s quality, reducing the risk of bias and improving the accuracy of our election forecast.
+
+## Idealized Survey Design
+
+An effective survey design is essential for gathering reliable data. An ideal survey, in this context, would begin with a brief introductory statement explaining its purpose and relevance, followed by a contact section providing details for respondents who have inquiries about the survey. This introductory portion establishes transparency and builds trust with participants, encouraging honest and thoughtful responses.
+
+### Structure and Content
+
+- **Introduction**: The introduction would outline the survey’s objectives, with a focus on collecting voter preferences. It would clarify the nonpartisan nature of the survey, emphasizing its commitment to capturing genuine responses rather than promoting any particular candidate or party.
+
+- **Demographics and Screening**: The survey would then include initial screening questions to determine respondent eligibility, focusing on demographic details like age, location, political affiliation, and voting intention (e.g., “Are you a registered voter?”). These questions would allow for stratified analysis later on, enabling more accurate representation of the population.
+
+- **Main Survey Content**: Questions on candidate preference would be phrased neutrally to avoid leading respondents. The question sequence would prioritize clarity and relevance, starting with general preferences and moving to specific policy issues to minimize response bias. Each question would be reviewed to ensure it remains appropriate for a diverse audience, regardless of political affiliation or demographic background.
+
+- **Conclusion and Thank-You Section**: The survey would close by thanking respondents for their participation, reinforcing that their responses contribute to a more accurate reflection of public sentiment. This section would also include an opt-out option, allowing participants to withdraw from the panel or request removal of their data, in line with ethical data practices.
+
+### Additional Design Considerations
+
+Survey questions would be carefully ordered to maintain respondent engagement. For instance, candidate preference questions would appear early, while more detailed policy questions would follow, reducing potential fatigue that might affect responses. Finally, a balance between closed-ended and open-ended questions would be maintained, with closed-ended questions providing quantitative data and open-ended questions allowing qualitative insights.
+
+## Pollster Methodology Overview and Evaluation
+
+In this analysis, we feature data from YouGov, a prominent polling organization known for its transparent and systematic approach. Below is an in-depth overview of YouGov’s methodology, including sample selection, stratification, weighting, and strengths and limitations.
+
+### Sampling Approach
+
+YouGov’s data is derived from an online panel of respondents who voluntarily register to participate in surveys. The sampling approach uses a non-randomized online panel, where respondents can opt in to participate at their discretion. This panel-based approach provides access to a large and diverse sample but introduces the potential for self-selection bias, as respondents who choose to participate may differ systematically from the broader population. To address this, YouGov employs several corrective measures:
+
+- **Stratified Sampling**: YouGov uses stratified sampling to ensure that diverse subgroups within the population are represented accurately. Participants are stratified based on demographic characteristics such as age, gender, political affiliation, and geographic location. Stratification ensures that the sample includes a balanced representation of various voter demographics, reducing the risk of over-representation of any particular group and enhancing the representativeness of the data.
+
+- **Weighting Adjustments**: In addition to stratified sampling, YouGov applies weighting to adjust for non-response bias. Each respondent’s answers are weighted based on demographic variables (e.g., age, gender, political affiliation) to align with national population benchmarks. This weighting process helps correct imbalances in representation and ensures that responses from underrepresented groups are amplified to better reflect the general population. Although weighting can improve the overall representativeness, it relies on accurate demographic benchmarks and assumes that non-respondents are similar to respondents within each demographic group.
+
+### Survey Administration
+
+YouGov conducts its surveys online, allowing respondents to answer questions via a web-based interface. This format enables rapid data collection and a wide geographic reach, providing timely insights into public sentiment. Additionally, online surveys offer flexibility in design, enabling YouGov to customize questions for different respondent groups. However, the exclusive reliance on online data collection may exclude certain demographic groups, particularly older or lower-income individuals with limited internet access, potentially impacting the data’s overall representativeness.
+
+### Strengths and Limitations
+
+The primary strength of YouGov’s methodology lies in its stratified sampling and weighting practices, which enhance the reliability and generalizability of its findings. By adjusting for demographic imbalances and ensuring representation across key subgroups, YouGov effectively mitigates some of the biases introduced by a non-random sample. Additionally, the online survey format allows YouGov to reach a large, geographically diverse audience, improving the timeliness of its data collection and enabling more frequent polling.
+
+However, the methodology is not without limitations. The non-random sampling approach, while efficient and scalable, introduces potential bias due to self-selection. The online-only format may also exclude specific demographic groups, and despite weighting adjustments, the absence of certain perspectives could limit the data’s comprehensiveness. Moreover, reliance on self-reported demographic information for stratification and weighting can introduce errors if respondents misreport or misinterpret these details.
+
+### Suvery Link
+https://forms.gle/UfLZNGEZ1jt1ycq88
+
+### Copy of Survery
+Section 1: Eligibility and Demographics
+
+Are you a U.S. citizen?
+
+Yes
+No
+Are you a registered voter?
+
+Yes
+No
+What is your age group?
+
+18–24
+25–34
+35–44
+45–54
+55–64
+65+
+What is your gender?
+
+Male
+Female
+Non-binary
+Prefer not to say
+Which racial or ethnic group do you identify with? (Select all that apply)
+
+White
+Black or African American
+Hispanic or Latino
+Asian
+Native American or Alaska Native
+Native Hawaiian or Pacific Islander
+Other (please specify)
+Prefer not to say
+What is your current state of residence?
+(Drop-down list of all 50 U.S. states)
+
+What is your level of education?
+
+Less than high school
+High school or equivalent
+Some college, no degree
+Associate degree
+Bachelor’s degree
+... (74 lines left)
 
 \newpage
 

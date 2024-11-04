@@ -13,39 +13,89 @@
 library(tidyverse)
 set.seed(853)
 
+# Number of Observations
+n <- 1000
+# Simulation parameters
+harris_support <- 50 # assumption of harris support
+poll_deviation <- 2.2 # Average polling standard deviation  https://5harad.com/papers/polling-errors.pdf page 612
 
-#### Simulate data ####
+
+# Define a few pollsters and their ratings and method
+pollsters <- tribble(
+  ~name,                          ~rating,~method,
+  "The New York Times/Siena College", 4.3, "Phone",
+  "YouGov",                           4.5, "Online",
+  "Ipsos",                            4.3, "Online",
+  "TIPP Insights",                    4.0, "Mixed",
+  "Emerson",                          4.2, "Mixed"
+)
+
+# Define swing states with their baseline characteristics
+swing_states <- tribble(
+  ~state,  ~harris_margin,
+  "AZ",     0.5,
+  "GA",    -0.3,
+  "MI",     2.1,
+  "NV",    -0.8,
+  "PA",     1.4,
+  "WI",     0.9
+)
+
+
 # State names
 states <- c(
-  "New South Wales",
-  "Victoria",
-  "Queensland",
-  "South Australia",
-  "Western Australia",
-  "Tasmania",
-  "Northern Territory",
-  "Australian Capital Territory"
+  "Alabama",
+  "Alaska",
+  "Arizona",
+  "Arkansas",
+  "California",
+  "Colorado",
+  "Connecticut",
+  "Delaware",
+  "Florida",
+  "Georgia",
+  "Hawaii",
+  "Idaho",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Kansas",
+  "Kentucky",
+  "Louisiana",
+  "Maine",
+  "Maryland",
+  "Massachusetts",
+  "Michigan",
+  "Minnesota",
+  "Mississippi",
+  "Missouri",
+  "Montana",
+  "Nebraska",
+  "Nevada",
+  "New Hampshire",
+  "New Jersey",
+  "New Mexico",
+  "New York",
+  "North Carolina",
+  "North Dakota",
+  "Ohio",
+  "Oklahoma",
+  "Oregon",
+  "Pennsylvania",
+  "Rhode Island",
+  "South Carolina",
+  "South Dakota",
+  "Tennessee",
+  "Texas",
+  "Utah",
+  "Vermont",
+  "Virginia",
+  "Washington",
+  "West Virginia",
+  "Wisconsin",
+  "Wyoming"
 )
 
-# Political parties
-parties <- c("Labor", "Liberal", "Greens", "National", "Other")
-
-# Create a dataset by randomly assigning states and parties to divisions
-analysis_data <- tibble(
-  division = paste("Division", 1:151),  # Add "Division" to make it a character
-  state = sample(
-    states,
-    size = 151,
-    replace = TRUE,
-    prob = c(0.25, 0.25, 0.15, 0.1, 0.1, 0.1, 0.025, 0.025) # Rough state population distribution
-  ),
-  party = sample(
-    parties,
-    size = 151,
-    replace = TRUE,
-    prob = c(0.40, 0.40, 0.05, 0.1, 0.05) # Rough party distribution
-  )
-)
 
 
 #### Save data ####

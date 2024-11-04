@@ -14,7 +14,7 @@ data <- read_csv("data/01-raw_data/raw_data.csv") |>
 
 analysis_data <- data |>
   select(
-    pollster, numeric_grade, state, candidate_name, pct, sample_size, pollscore,   # Selecting relevant columns
+    pollster, numeric_grade, state, candidate_name, pct, sample_size, pollscore,transparency_score,   # Selecting relevant columns
     population, end_date
     )|>
   drop_na(numeric_grade,pct,sample_size, end_date
@@ -23,8 +23,7 @@ analysis_data <- data |>
     numeric_grade >= 2 # Based off mean and median 
   )|>
   mutate(
-    state = if_else(is.na(state) | state == "--", "National", state),
-    national_poll = if_else(state == "National",1,0)
+    state = if_else(is.na(state), "National", state), 
   )|> 
   mutate(
     end_date = mdy(end_date)
@@ -39,7 +38,6 @@ analysis_data <- data |>
     state = factor(state),
     candidate_name = factor(candidate_name),
     population = factor(population),  
-    national_poll = factor(national_poll)
   )
 
 

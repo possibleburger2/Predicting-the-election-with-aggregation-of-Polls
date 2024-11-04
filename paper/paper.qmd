@@ -140,6 +140,7 @@ kable(top_pollsters, format = "markdown")
 
 @tbl-topster shows the top 5 most frequent pollsters in the dataset, with each pollster’s total poll count, average pollscore (measuring reliability and historical accuracy), and average numeric grade (indicating overall quality). 
 ### Distribution of Numeric Grade and Pollscore of Polls
+\newpage
 
 ```{r, fig.width = 12, fig.height = 6}
 #| warning: false
